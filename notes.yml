@@ -1,0 +1,272 @@
+Once installed show version
+' minikube version '
+Start the cluster:
+' minikube start '
+
+Cluser info:
+can interact with the cluster with 'kubectl CLI'
+get cluseter health status 'kubectl cluster-info'
+
+Deploy Containers:
+    - use 'minikube start' # allows containers to be deployed onto the cluster - ' kubectl run first-deployment --image=katacoda/docker-http-server --port=80 '
+    - ' kubectl get pods ' # show running pods status
+    - ' kubectl config view '  #
+    - once a container is running it can be exposed via different networking options.
+      * one possible solution is NodePort # provides a dynamic port to a container
+      ' kubectl expose deployment first-deployment --port=80 --type=NodePort '
+      * below finds the allocated port and executes a HTTP request
+      "  export PORT=$(kubectl get svc first-deployment -o go-template='{{range.spec.ports}}{{if .nodePort}}{{.nodePort}}{{"\n"}}{{end}}{{end}}') "
+      " curl $(kubectl config view | grep 'server:' | awk -F ":" '{print $3}' | sed 's/\/\///g'):$PORT \"
+    - Dashboard:
+        - allows you to view your applications in a UI. In this deployment the dashboard has been made available on 
+          port 30000
+        " echo $(kubectl config view | grep 'server:' | awk -F ":" '{print $3}' | sed 's/\/\///g'):30000 "
+
+Bootstrap a kubernetes cluster with Kubeadm:
+  - solves the problem of handling TLS encryption config, deploying the core kubernetes components
+    ensureing that add. nodes can easily join the cluser.
+  - resulting cluster is sercured out of the box via mechanisms such as RBAC
+  dets - https://github.com/kubernetes/kubeadm
+
+  - Initilise Master:
+      * kubeadm has been installed on the nodes. 
+        - packages are avail. for Ubuntu 16.04, CentOS 7 or HypriotOS v1.0.1+
+      * launch the master node
+        - resp. for running the control plane components
+          etcd and API server
+        - clients will comm. to the api to schedule workloads and manage the state of the cluster
+          ' kubeadm init --token=XXXXX.XXXXXX --kubernetes-version $(kubeadm version -o short) '
+            !!! in prod should use kubeadm to generate a token
+  - Join Cluster:
+      * once master is initialised additional nodes can join the cluster # as long as they have the correct token
+        - tokens can be managed from 'kubeadm token'
+          ' kubeadm token list ' # on master node
+      * join the cluster
+        - ' kubeadm join --discovery-token-unsafe-skip-ca-verification --token=XXXXXXX.XXXXXX 172.17.0.13:6443 '
+
+  - View Nodes:
+      * cluster is now initialised.
+      * master node will manage the cluster
+      * one worker will run our container workloads
+      * Tasks
+        - manage the kubernetes cluster. Client config and certificates are required
+        - this config is created on when 'kubeadm' initialises the cluster
+        - command copies the config to the users home dir and sets the env var for the CLI
+          ' sudo cp /etc/kubernetes/admin.conf $HOME/
+            sudo chown $(id -u):$(id -g) $HOME/admin.conf
+            export KUBECONFIG=$HOME/admin.conf '
+        - kubernetes cli 'kubectl' can now use the config to access the cluster
+        - reuturn the two nodes in our cluster 'kubectl get nodes'
+          * nodes may not be ready, container network interface has not been deployed yet !!!
+
+  - Deploy Container Network Interface (CNI):
+      * defines how diff. nodes and their workloads should communicate
+      * multiple network prividers available
+      * use WeaveWorks
+        see config ' cat /opt/weave-kube'
+        apply ' kubectl apply -f /opt/weave-kube'
+        deploys a series of pods on the cluser ' kubectl get pod -n kube-system'
+        https://www.weave.works/docs/net/latest/kubernetes/kube-addon/
+
+  - Deploy Pod:
+      - two nodes should now be in a ready state, should be good to launch deployments
+      - kubctl to deploy pods, commands issued from Master with each node only responsible 
+        to run the workloads
+        ' kubectl run http --image=katacoda/docker-http-server:latest --replicas=1 '
+        show pod creation on master 'kubectl get pods'
+        once running you can see the docker container on the node ' docker ps | grep docker-http-server '
+
+  - Deploy the Dashboard:
+      - web based ui to see into the cluster
+      - deploy the dashboard
+        'kubectl apply -f dashboard.yml' on master
+      - dashboard is deployed into kube-system namespace see status at
+        'kubectl get pods -n kube-system' on master
+      - when the dashboard was deployed it assigned NodePort of 30000
+
+Deploying Containers Using Kubectl:
+    - use kubectl to create and launch deployments
+    - replication controllers and expose them via services without writing yaml defs
+    - allows you to quickly launch containers onto the cluster
+      ' minikube start '
+      ' kubectl get nodes'
+    - Step 2:
+        * run command creates a deployment based on
+          - parameters specified like the image or replicas
+          - similar to docker run
+        * deployment is issued from the master
+        * Task
+          - following command will launch a deployment called 'http'
+        * will start a container based on the docker image 'katacoda/docker-http-server:latest'
+        ' kubectl run http --image=katacoda/docker-http-server:latest --replicas=1'
+        ' kubectl get deployments '
+        ' kubectl describe deployment http '
+    - Step 3:
+        * kubectl expose
+        * with a deployment created we can use kubectl to create a service which exposes pods on a port
+        * exposed the newly deployed http deployemnt via 'kubectl expose'
+        * IP FOR THE FOLLOWING CAN BE FOUND UNDER 'kubectl config view'
+      ' export SERVERIP=$(kubectl config view | grep 'server:' | awk -F ":" '{print $3}' | sed 's/\/\///g') \"
+        ' kubectl expose deployment http --external-ip="172.17.0.11" --port=8000 --target-port=80 '
+        can ping on ' curl http://$SERVERIP:8000 '
+    - Step 4:
+        * kubectl run and expose
+        * with kubectl run it's possible to create the deployment and expose it as a single command
+        * use 'command' to create a second http servie exposed on port 8001
+        ' kubectl run httpexposed --image=katacoda/docker-http-server:latest --replicas=1 --port=80 --hostport=8001 '
+        ' curl http://172.17.0.11:8001 '  # didn't work
+        * under the covers this exposes the pod via Docker Port Mapping.
+        ' kubectl get svc '
+        * find details ' docker ps | grep httpexposed '
+
+    - Step 5:
+        * Scale Containers
+        * we can now use kubectl to scale the number of replicas
+        * scaling will request kubernetes to launch additinal pods
+        * pods will be automatically load balanced using the exposed service
+        * ' kubectl scale ' allows us to adjust the number of Poss running for a particular deployment
+          or replication controller
+          ' kubectl scale --replicas=3 deployment http '
+          ' kubectl get pods ' see all the running nodes
+          * once each pod starts it will be added to the load balancer servie
+          * describing the service allows us to see the endpoint and the associated pods
+          ' kubectl describe svc http '
+         * requests to the service will request in diff nodes 
+        ' curl http://172.17.0.11:8000 '
+        !!!!!!!! REMOVE OLD PODS
+        ' kubectl get rs --all-namespaces '
+        ' kubectl delete rs name '
+
+Deploy Containers Using YAML:
+    - Step 1 Create Deployment:
+      * deployment object is the most common object
+        - defines the container spec required ( with the same names and labels used by other parts
+          of kubernetes)
+      * definition defines how to launch an app called webapp1 using the docker image
+      ' deployment.yaml '
+	  ' kubectl create -f deployment.yaml '
+      ' kubectl get deployment '
+      ' kubectl describe deployment webapp1 '
+	- Step 2 Create a Service:
+	  * kubernetes has powerful networking capabilities to controll how apps communicate
+	  * can be controlled by yaml
+	  * 'service.yaml' makes appl applications witht he label webapp1
+	  * as multiple replicas or instances are deployed they will automatically be load balanced based on common
+		label
+		' kubectl create -f service.yaml '
+		' kubectl get svc '
+		' kubectl describe svc webapp1-svc '
+		' curl host01:30080 '
+	- Step 3 Scale Deployment:
+	  * details in YAML can be changed as diff configs are required for deployment
+	  * manifests should be kept under source control and used to ensure config in prod matches
+	  * up date 'deployment.yaml' and increase replicas: 4
+		' kubectl apply -f deployment.yaml '
+		' kubctl get deployment '
+		' kubctl get pods '
+
+Deploy guestbook example on kubernetes:
+    - explains how to launch a simple multi-tier web app using kubernetes and Docker.
+    - Guestbook stores notes from guests in Redis vida JavaScript API calls
+    - Redis contains a master(storage) and replica set of redis slaves
+    - Core concepts: 
+      * pods
+      * replication controllers
+      * services
+      * NodePorts
+    
+    - Step 1:
+        * start a single-node cluster with a helper script
+        'launch.sh' ???
+        * Health check
+        'kubectl cluster-info'
+        'kubectl get nodes'
+    - Step 2:
+        * start the redis master
+        * a kubernetes service deployment has at least 2 parts
+          1 replication controller
+            - defines how many instances
+            - name to id the service
+              'redis-master-controller.yaml'
+          2 service
+         * show what's running
+            - 'kubectl get rc'
+            - all containers are described as pods
+              * a pod is a collection of containers that makes up a particular app
+              'kubectl get pods'
+            - see what's running in docker 
+              'docker ps | grep redis'
+    - Step3: Redis master service
+      * a kubernetes service is a named load balancer that proxies traffic to one or more containers
+        - works even if they are on diff nodes
+      * service proxy communicates within the cluster and rarely expose ports to the outside interface
+      * when launching a service it looks like you can't connect using curl or netcat unless it's started as part of Kubernetes
+      * !!! recomended approach is to have an LoadBalancer service to handle external communication
+      * create a service 
+        'redis-master-service.yaml'
+        ' kubectl create -f redis-master-service.yaml'
+        'kubectl get services'
+        'kubectl describe services redis-master'
+    - Step 4: Replication Slave Pods
+      * redis slaves will have replicated data from redis master
+      * controller defines how the service runs
+      * in this ex we need to determine how the service discovers the other pods
+      * YAML represents the '_GET_HOSTS_FROM' property as DNS
+      * start redis slave controller
+      'redis-slave-controller.yaml'
+      'kubectl create -f redis-slave-controller.yaml'
+      'kubectl get services'
+    - Step 5: Redis slave service
+      * need to make slaves accessible to incoming requests.
+      * done by starting a service which knows how to comm. with redis-slave
+      * since we have 2 replica pods the serviec will provice load balancig between two nodes
+      'redis-slave-service.yaml'
+      'kubectl create -f redis-slave-service.yaml'
+      'kubectl get services'
+    - Step 6: Front end replicated pods
+      * with data services started, we can start the web app
+      * same pattern as data services
+      * launch frontend
+      * YAML defines a service called frontend that uses the image kubernetes/example-guestbook-php-redis:v2
+      * replication counter will ensure X ammount of nodes always exist
+      'frontend-controller.yaml'
+      'kubectl create -f frontend-controller.yaml'
+      'kubectl get rc'
+      'kubectl get pods'
+      * php code uses http and json to comm with redis
+        - when setting a value - requests go to redis-master while read data comes from redis-slave
+    - Step 7: Guestbook Frontend Service
+      * make the front end accessible we need to start a service to configure the proxy
+      * Yaml defines the service as 'NodePort'
+        - NodePort allows you to set well-known ports that are shared accross the cluster
+        - like '-p 80:80' in docker
+      * this case we define our webapp is running on port 80 and we expose the service on 30080
+      'frontend-service.yaml'
+      'kubectl get services'
+    - Step 8: Access Guestbook Frontend
+      * with all controllers and services defined kubernetes will start launching them as pods
+      * a pod can have diff states depending on what's happening
+        ex) docker image is still downloading on the pod == pending state
+          once ready status will change to 'running'
+      'kubeclt get pods' show pod status
+      * Find NodePort
+        - if you didn't assign a well-known NodePort then Kubernetes will assign an available port randomly
+          can be found with kubectl
+          'kubectl describe service frontend | grep NodePort'
+        - once the pod is running you will be able to view the UI via port 30080
+      * find IP with 'kubeclt config view | grep "server:" 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
