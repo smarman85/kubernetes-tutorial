@@ -13,6 +13,13 @@ Client Version: version.Info{Major:"1", Minor:"9", GitVersion:"v1.9.5", GitCommi
 Server Version: version.Info{Major:"", Minor:"", GitVersion:"v1.9.4", GitCommit:"bee2d1505c4fe820744d26d41ecd3fdd4a3d6546", GitTreeState:"clean", BuildDate:"2018-03-21T21:48:36Z", GoVersion:"go1.9.1", Compiler:"gc", Platform:"linux/amd64"}
 ```
 
+## Docker version:
+```
+$ docker --version
+Docker version 17.12.0-ce, build c97c6d6
+
+```
+
 ## Useful Commands:
 ```
 # Find IP and NodePorts

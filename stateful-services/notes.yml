@@ -1,0 +1,73 @@
+Running Stateful Services on Kubernetes:
+    - NFS is a protocl that allows nodes to read/write data over a network
+    - works by having a master node running the NFS daemon and stores the data
+      * master node makes certain directories available over the network
+    - clients access the master via shared drive mounts
+      * from the view of the app, they are writing to local disks
+    - senario
+      * nfs server is handled by a customized container
+        - container makes directories available via NFS and stores data indise the container
+          ! production it's recommended to run NFS as a dedicated server
+      * 'docker run d --net=host --privileged --name nfs-server katacoda/contained-nfs-server:centos7 \
+        /exports/data-0001 /exports/data-0002 '
+      * nfs server exposes two dirs data-0001 and data-0002
+    - Step 2 : Deploy Persistent Volume
+      * PersistentVolume config is needed for kubernetes to understand the available NFS
+      * PersistentVolume supports diff protocols for storage (AWS EBS volumes, GCE Storage, Openstack,cinder, glusterfs and NFS)
+      * the config gives an abstraction between storage and API allowing for a consistent experience
+      * NFS
+        - one PersistentVolume relates to one NFS dir.
+        - when one container has finished with the volume, the data can be retained for future use or the vol can be 
+          recycled (All data is deleted)
+          * Policy is defined by the persistentVolumeReclaimPolicy option
+          !!!!!!!! MAKE SURE SERVER IPS MATCH THE HOST CONFIG ' kubectl config view | grep server'
+          'nfs-0001.yaml' and 'nfs-0002.yaml'
+          'kubectl create -f nfs-0001.yaml'
+          'kubectl create -f nfs-0002.yaml'
+          'kubectl get pv'
+     - Step 3: Deploy Persistent Volume Claim
+       * once the persistent volume is available applications can claim the volume for use
+       * claim is designed to stop applications accidentally writing to the same volume and causing data corruption
+       * specifies the requriements for a volume
+        - includes read/write access and storage space required
+          'pvc-mysql.yaml' and 'pvc-http.yaml'
+        ' kubectl create -f pvc-mysql.yaml '
+        ' kubectl create -f pvc-http.yaml '
+        ' kubectl get pvc '
+       * the claim will output which volume the claim is mapped to 
+     - Step 4: Use the Volume
+       * when a deployment is defined, it can assign itself to a previous claim
+       * '/var/lib/mysql/data' volume mounts:
+           '
+       spec:
+           volumeMounts:
+               - name: mysql-persistent-storage
+                 mountPath: /var/lib/mysql/data
+        volumes:
+            - name: mysql-persistent-storage
+              persistentVolumeClaim:
+                  claimName: claim-mysql
+              '
+        * task, launch two new pods with persistent volume claims
+          - volumes are mapped to correct firs when they start
+            * allowing apps to read/write as if it was a local dir
+            'pod-mysql.yaml' and 'pod-www.yaml'
+            ' kubectl crate -f pod-mysql.yaml '
+            ' kubectl crate -f pod-www.yaml '
+        * if a persistent voluem claim is not assigned to a persistent volume the pod will be 'pending'
+     - Step 5: Read/Write Data
+       * can now read/write
+       * mysql will store all database changes to the NFS server while HTTP Server will serve static files from the NFS drive
+       * data will persist while upgrading/migrating and restarting
+       * test http server
+        - write hello world index.html file
+        - in this senario we know http directory will be based on data-0001 as the volume def hasn't driven enough space
+          to satisfy teh mysql size req
+          \' docker exec -it nfs-server bash -c "echo 'Hello World' > /exports/data-0001/index.html" \'
+        - based on the ip of the pod, it should retrun the expected response
+       ` ip=$(kubectl get pod www -o yaml | grep podIP | awk '{split($0,a,":"); print a[2]}'); echo $ip `
+        'curl $ip' should return hello world
+        - when data on the nfs share changes then the pod will read the newly updated data
+          \' docker exec -it nfs-server bash -c "echo 'Hello NFS World' > /exports/data-0001/index.html" \'
+          'curl $ip 'should return Hello NFS World
+

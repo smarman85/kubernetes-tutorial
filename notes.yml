@@ -254,7 +254,74 @@ Deploy guestbook example on kubernetes:
           can be found with kubectl
           'kubectl describe service frontend | grep NodePort'
         - once the pod is running you will be able to view the UI via port 30080
-      * find IP with 'kubeclt config view | grep "server:" 
+      * find IP with 'kubeclt config view | grep "server:"'
+
+Kubernetes Networking Intro:
+  - advanced networking capabilities that allow pods and services to communicate inside the cluster's network externally
+  - Services:
+      * Cluster IP
+      * Target Ports
+      * NodePort
+      * External IPs
+      * Load Balancer
+  - Step 1: Cluster IP
+    * ip is the default approach when creating a kubernetes service 
+    * the service allocates an internal ip that other components can use to access the pods
+    * having a single ip address enables the service to be load balanced accross multiple pods
+    * services are deployed via
+    'kubectl apply -f clusterip.yaml'
+      - this will deploy the web app with two replicas to showcase load balacning along with a service
+      - view pods 'kubeclt get pods'
+      - it will also deploy a service 'kubeclt get svc'
+    * more detailson the service config and active endpoints (pods) can be viewed with
+    'kubectl describe svc/webapp1-clusterip-svc'
+    * after deployment can view the service via the clusterIp
+    'export CLUSTER_IP=$(kubectl get services/webapp1-clusterip-svc -o go-template='{{(index .spec.clusterIP)}}') \'
+    'echo CLUSTER_IP=$CLUSTER_IP'
+    'curl $CLUSTER_IP:80'
+  - Step 2: Target Port
+    * allows us to separate the port the service is available on from the one the application lives on
+    * is the port which the app is configured to listen on
+    * is how the application will be accessed from the outside
+    'kubectl apply -f clusterip-target.yaml'
+    'kubeclt get svc'
+    'kubectl describe svc/webapp1-cluster-ip-targetport-svc'
+    * after the service pods have deployed it can be accessed via the cluster ip but on the defined port 8080
+    'export CLUSTER_IP=$(kubectl get services/webapp1-clusterip-targetport-svc -o go-template='{{(index .spec.clusterIP)}}')  \'
+    'echo CLUSTER_IP=$CLUSTER_IP'
+    'curl $CLUSTER_IP:8080'
+  - Step 3: NodePort
+    * while 'TargetPort' and 'ClusterIP' make the service available inside the cluster
+    * NodePort exposes the service on each Node's IP via the defined static port
+      - no matter which node is accessed, the service is reachable based on the port number defined
+    'kubectl apply -f nodeport.yaml'
+  - Step 4: External IPs
+    * another approach to making a service available outside fo the cluster is via external ip addresses
+    \' sed -i 's/HOSTIP/172.17.0.16/g' externalip.yaml 
+    'cat externalip.yaml'
+    'kubectl apply -f externalip.yaml'
+    'kubectl get svc'
+    'kubectl describe svc/webapp1-externalip-svc'
+    'curl 172.17.0.16'
+  - Step 5: Load Balancer
+    * when running in the cloud (EC2, Azure) it's possible to configure and assign a public IP address issued via the cloud provider
+    * allows additional public ip addresses to be allocated to a kubernetes cluster without interacting with the cloud provider
+    * possible to dynamically allocatee ip addresss to LB type services
+      - done by deploying the cloud provider 'kubectl apply -f cloudprovider.yaml'
+      - when runnign in a service provided by a cloud provider this is not required
+    * when a service requests a Load Balancer, the provider will allocate one from the 10.10.0.0/26 range defined in the config
+    'kubectl get pods -n kube-system'
+    'kubectl apply -f loadbalancer.yaml'
+    'kubectl describe svc/webapp1-loadbalancer-svc'
+    * while the ip address is being defined the service will show pending
+      - once allocated it will appear in the service list
+      - 'kubectl get svc'
+      - 'kubectl describe svc/webapp1-loadbalancer-svc'
+    * the servie can now be accessed via the ip address assigned. in this case from 10.10.0.0/26 range
+    \' export LoadBalancerIP=$(kubectl get services/webapp1-loadbalancer-svc -o go-template='{{(index .status.loadBalancer.ingress 0).ip}}') \'
+    'echo LoadBalancerIP=$LoadBalancerIP'
+    'curl $LoadBalancerIP'
+
 
 
 
