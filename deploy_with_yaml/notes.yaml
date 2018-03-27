@@ -1,0 +1,29 @@
+Deploy Containers Using YAML:
+    - Step 1 Create Deployment:
+      * deployment object is the most common object
+        - defines the container spec required ( with the same names and labels used by other parts
+          of kubernetes)
+      * definition defines how to launch an app called webapp1 using the docker image
+      ' deployment.yaml '
+      ' kubectl create -f deployment.yaml '
+      ' kubectl get deployment '
+      ' kubectl describe deployment webapp1 '
+    - Step 2 Create a Service:
+      * kubernetes has powerful networking capabilities to controll how apps communicate
+      * can be controlled by yaml
+      * 'service.yaml' makes appl applications witht he label webapp1
+      * as multiple replicas or instances are deployed they will automatically be load balanced based on common
+        label
+        ' kubectl create -f service.yaml '
+        ' kubectl get svc '
+        ' kubectl describe svc webapp1-svc '
+		' minikube service webapp1-svc --url '
+        ' curl host01:30080 '
+    - Step 3 Scale Deployment:
+      * details in YAML can be changed as diff configs are required for deployment
+      * manifests should be kept under source control and used to ensure config in prod matches
+      * up date 'deployment.yaml' and increase replicas: 4
+        ' kubectl apply -f deployment.yaml '
+        ' kubctl get deployment '
+        ' kubctl get pods '
+

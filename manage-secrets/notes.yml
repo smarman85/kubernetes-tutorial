@@ -1,0 +1,27 @@
+Create Secrets:
+    - kubernetes requires secrets to be encoded as Base64 strings
+    - can use command line tool we can create Base64 strings and store them as vars
+      ' username=$(echo -n "admin" | base64) '
+      ' password=$(echo -n "aldkfjasdlfkajs" | base64) '
+    - secrets can be defined using yaml
+      below creates a collection of key/value secrets that can be accessed via name
+' echo "apiVersion: v1
+kind: Secret
+metadata:
+  name: test-secret
+type: Opaque
+data:
+  username: $username
+  password: $password" >> secret.yaml '
+    - when launching pods that need access to secret data we can reference this file
+    - 'kubectl create -f secret.yaml' 
+    - 'kubectl get secrets' # allows you to view all the secret collections defined
+
+  - Step 3: consume via env vars
+    * in the 'secret-env.yaml' we defined a pod with a var populated from the previously created secret
+    'cat secret-evn.yaml'
+    * to populate the env var we define the name "in this case" SECRET_USERNAME
+      - along with the name of the secrets collection which contains the data
+    'kubectl create -f secret-env.yaml'
+    * once the pod is started you can populate you can output populated env vars
+    'kubectl exec -it secret-env-pod env | grep SECRET_'

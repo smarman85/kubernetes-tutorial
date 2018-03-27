@@ -1,0 +1,48 @@
+10406  kubectl describe deployment http
+10408  kubectl expose deployment http --external-ip="192.168.99.101" --port=8000 --targetport=8001
+10409  kubectl expose deployment http --external-ip="192.168.99.101" --port=8000 --target-port=8001
+10410  kubectl expose deployment http --external-ip="192.168.99.101" --port=8000 --target-port=80
+10411  kubectl expose deployment http --external-ip="192.168.99.101" --port=8001 --target-port=80
+10412  minikube delete
+10413  minikube start
+10414  kubectl run http --image=katacoda/docker-http-server:latest --replicas=1
+10415  kubectl config view | grep server
+10416  kubectl expose deployment http --external-ip="192.168.99.102" --port=8000 --target-port=80
+10417  curl 192.168.99.102:8080
+10418  curl localhost:8080
+10419  kubectl run httpexposed --image=katacoda/docker-http-server:latest --replicas=1 --port=80 --hostport=8001
+10420  curl localhost:80
+10421  curl localhost:8001
+10422  kubeclt get svc
+10424  minikube get deployment
+10425  minikube get deployments
+10426  minikube get svc
+10427  kubeclt get deployments
+10428  kubectl get deployments
+10429  _service httpexposed exposed
+10430  kubectl expose deployment httpexposed --type=NodePort
+10431  kubectl get svc
+10432  minikube service httpexposed
+10433  minikube service httpexposed --url
+
+
+
+
+
+# WORKING RUNS
+10438  minikube start
+10439  kubectl run httpexposed --image=katacoda/docker-http-server:latest --replicas=1 --port=80 --hostport=8000
+10440  kubectl get svc
+10441  kubectl get deployment
+NAME          DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+httpexposed   1         1         1            1           7m
+10442  kubectl expose deployment httpexposed --type=NodePort
+10443  minikube service httpexposed --url
+10444  curl output of above
+
+
+10462  kubectl run first-deployment --image=katacoda/docker-http-server --port=80
+10467  kubectl expose deployment first-deployment --port=80 --type=NodePort
+10468  export PORT=$(kubectl get svc first-deployment -o go-template='{{range.spec.ports}}{{if .nodePort}}{{.nodePort}}{{"\n"}}{{end}}{{end}}')
+10470  kubectl config view | grep server
+10471  curl 192.168.99.104:$PORT
