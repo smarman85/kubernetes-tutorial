@@ -1,0 +1,16 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: persistapp1
+spec:
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: persistapp1
+    spec:
+      containers:
+      - name: persistapp1
+        image: katacoda/contained-nfs-server:centos7
+        ports:
+        - containerPort: 80
