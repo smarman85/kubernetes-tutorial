@@ -1,0 +1,92 @@
+Deploy guestbook example on kubernetes:
+    - explains how to launch a simple multi-tier web app using kubernetes and Docker.
+    - Guestbook stores notes from guests in Redis vida JavaScript API calls
+    - Redis contains a master(storage) and replica set of redis slaves
+    - Core concepts:
+      * pods
+      * replication controllers
+      * services
+      * NodePorts
+
+    - Step 1:
+        * start a single-node cluster with a helper script
+        'launch.sh' ???
+        * Health check
+        'kubectl cluster-info'
+        'kubectl get nodes'
+    - Step 2:
+        * start the redis master
+        * a kubernetes service deployment has at least 2 parts
+          1 replication controller
+            - defines how many instances
+            - name to id the service
+              'redis-master-controller.yaml'
+          2 service
+         * show what's running
+            - 'kubectl get rc'
+            - all containers are described as pods
+              * a pod is a collection of containers that makes up a particular app
+              'kubectl get pods'
+            - see what's running in docker
+              'docker ps | grep redis'
+    - Step3: Redis master service
+      * a kubernetes service is a named load balancer that proxies traffic to one or more containers
+        - works even if they are on diff nodes
+      * service proxy communicates within the cluster and rarely expose ports to the outside interface
+      * when launching a service it looks like you can't connect using curl or netcat unless it's started as part of Kubernetes
+      * !!! recomended approach is to have an LoadBalancer service to handle external communication
+      * create a service
+        'redis-master-service.yaml'
+        ' kubectl create -f redis-master-service.yaml'
+        'kubectl get services'
+        'kubectl describe services redis-master'
+    - Step 4: Replication Slave Pods
+      * redis slaves will have replicated data from redis master
+      * controller defines how the service runs
+      * in this ex we need to determine how the service discovers the other pods
+      * YAML represents the '_GET_HOSTS_FROM' property as DNS
+      * start redis slave controller
+      'redis-slave-controller.yaml'
+      'kubectl create -f redis-slave-controller.yaml'
+      'kubectl get services'
+    - Step 5: Redis slave service
+      * need to make slaves accessible to incoming requests.
+      * done by starting a service which knows how to comm. with redis-slave
+      * since we have 2 replica pods the serviec will provice load balancig between two nodes
+      'redis-slave-service.yaml'
+      'kubectl create -f redis-slave-service.yaml'
+      'kubectl get services'
+    - Step 6: Front end replicated pods
+      * with data services started, we can start the web app
+      * same pattern as data services
+      * launch frontend
+      * YAML defines a service called frontend that uses the image kubernetes/example-guestbook-php-redis:v2
+      * replication counter will ensure X ammount of nodes always exist
+      'frontend-controller.yaml'
+      'kubectl create -f frontend-controller.yaml'
+      'kubectl get rc'
+      'kubectl get pods'
+      * php code uses http and json to comm with redis
+        - when setting a value - requests go to redis-master while read data comes from redis-slave
+    - Step 7: Guestbook Frontend Service
+      * make the front end accessible we need to start a service to configure the proxy
+      * Yaml defines the service as 'NodePort'
+        - NodePort allows you to set well-known ports that are shared accross the cluster
+        - like '-p 80:80' in docker
+      * this case we define our webapp is running on port 80 and we expose the service on 30080
+      'frontend-service.yaml'
+      'kubectl get services'
+    - Step 8: Access Guestbook Frontend
+      * with all controllers and services defined kubernetes will start launching them as pods
+      * a pod can have diff states depending on what's happening
+        ex) docker image is still downloading on the pod == pending state
+          once ready status will change to 'running'
+      'kubeclt get pods' show pod status
+      * Find NodePort
+        - if you didn't assign a well-known NodePort then Kubernetes will assign an available port randomly
+          can be found with kubectl
+          'kubectl describe service frontend | grep NodePort'
+        - once the pod is running you will be able to view the UI via port 30080
+      * find IP with 'kubeclt config view | grep "server:"'
+
+
