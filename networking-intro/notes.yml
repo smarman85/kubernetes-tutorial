@@ -1,0 +1,42 @@
+Cluster IP:
+    - default approach when creating a kubernetes services
+    - service is allocated a internal IP that components can use to access the pod
+    - having a single IP addr it allows the service to be load ballanced accross multiple pods
+      $ kubectl apply -f clusterip.yaml
+      $ kubectl get pods
+      $ kubectl get svc
+      $ export CLUSTER_IP=$(kubectl get services/webapp1-clusterip-svc -o go-template='{{(index .spec.clusterIP)}}')
+      $ echo CLUSTER_IP=$CLUSTER_IP
+      $ curl $CLUSTER_IP:80
+
+Target Port:
+    - allows us to sparate the port the service is available on from the port the application is listening on
+    - 'TargetPort' is the port the application is configured to listen on
+    - 'Port' is how the application will be accessed from the outside
+      $ kubectl apply -f clusterip-target.yaml
+      $ kubectl get svc
+      $ kubectl describe svc/webapp1-clusterip-targetport-svc
+      - after the service and pods have deployed, it can be accessed via the cluster IP as before
+        but this time from port 8080
+      - the app is still configured to listen on port 80
+      - Kubernetes service manages the translation between the two
+
+NodePort:
+    - While TargetPort and ClusterIP make it available to the inside the cluster
+    - the 'NodePort' exposes the service on each Nodes's IP via the defined static port
+    - no matter which Node within the cluster is accessed, the service will be reachable based on the port
+      number defined
+      $ kubectl apply -f nodeport.yaml
+      # the service can now be reached via the Node's IP address on the NodePort defined
+
+External IPs:
+    - another approach to making a service available outside of the cluster is via External IP addresses
+      $ kubectl apply -f externalip.yaml
+      # the service is now bound to the ip address and Port 80 of the master node
+
+Load Balancer:
+    - in the cloud it's possible to configure and assign a public ip address issued via the cloud provider.
+    - this will be used via an lb (ELB)
+        - allows for additional public IP addresses to be allocated to a Kubernetes cluster without directly
+          interacting with the cloud provider
+          $ kubectl apply -f cloudprovider.yaml
